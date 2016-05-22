@@ -21,10 +21,21 @@ void printVec(vector<auto>* v);
 
 int main()
 {
-	cout << "Please enter a problem size: ";
-	int probSize;
-	cin >> probSize;
-	auction(probSize);
+	cout << "Enter 0 if 500x500 problem size, 1 for custom size: ";
+	int isCustom;
+	cin >> isCustom;
+	if (isCustom)
+	{
+		cout << "Please enter a problem size: ";
+		int probSize;
+		cin >> probSize;
+		auction(probSize);
+	}
+	else
+	{
+		/* Run on fixed size problem */
+		auction(500);
+	}
 	return 0;
 }
 
