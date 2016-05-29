@@ -1,4 +1,4 @@
-name := "scala2"
+name := "scala"
 
 scalaVersion := "2.11.7"
 
