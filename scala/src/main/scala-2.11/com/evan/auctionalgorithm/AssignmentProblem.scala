@@ -3,20 +3,20 @@ package com.evan.auctionalgorithm
 import breeze.linalg._
 import breeze.numerics._
 
-class AssignmentProblem(val problemSize: Int)
+class AssignmentProblem(val probSize: Int)
 {
-	val C: DenseMatrix[Double] = ceil(DenseMatrix.rand(this.problemSize, this.problemSize) * this.problemSize.toDouble)
+	val C: DenseMatrix[Double] = ceil(DenseMatrix.rand(this.probSize, this.probSize) * this.probSize.toDouble)
 	val INF = Int.MaxValue
 
 	/* Main Auction Loop */
 	def runAuction(): Unit =
 	{
-		var assignment = Vector.fill(problemSize){INF}
-		var prices = Vector.fill(prices){1d}
+		var assignment = Vector.fill(probSize){INF}
+		var prices = Vector.fill(probSize){1d}
 		var eps = 1d
 		var iter = 1
 
-		while (eps > 1 / problemSize)
+		while (eps > 1 / probSize)
 		{
 			iter += 1
 			eps = 0 // Exit for now
