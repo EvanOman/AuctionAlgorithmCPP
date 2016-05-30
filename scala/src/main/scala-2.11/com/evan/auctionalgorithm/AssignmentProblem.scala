@@ -18,7 +18,13 @@ class AssignmentProblem(val probSize: Int)
 
 		while (eps > 1 / probSize)
 		{
-			iter += 1
+                        assignment = assignment.map(x => INF)
+                        
+                        while (assignment.filter(_ != INF).size > 0)
+                        {
+                            iter += 1
+                            assignment = assignment.map(x => 0)
+                        }
 			eps = 0 // Exit for now
 		}
 	}
