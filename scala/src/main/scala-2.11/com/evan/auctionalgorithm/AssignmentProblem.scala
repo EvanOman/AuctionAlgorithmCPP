@@ -2,6 +2,7 @@ package com.evan.auctionalgorithm
 
 import breeze.linalg._
 import breeze.numerics._
+import scala.collection.mutable._
 
 class AssignmentProblem(val probSize: Int)
 {
@@ -47,7 +48,7 @@ class AssignmentProblem(val probSize: Int)
 			These are meant to be kept in correspondence such that bidded[i]
 			and bids[i] correspond to person i bidding for bidded[i] with bid bids[i]
 		*/
-		var (tmpBidded, tmpBids, unAssig) = (Array[Int](), Array[Double](), Array.fill(probSize){false})
+		var (tmpBidded, tmpBids, unAssig) = (ArrayBuffer.empty[Int], ArrayBuffer.empty[Double], Array.fill(probSize){false})
 
 		for (i <- 0 to probSize)
 		{
@@ -77,7 +78,21 @@ class AssignmentProblem(val probSize: Int)
 				}
 
 				/* Computes the highest reasonable bid for the best object for this person */
+				val bid_i = (optObjVal_i._2 - secOptObjVal_i._2) + eps
+
+				/* Store the bidding info for future use */
+				tmpBidded.append(optObjVal_i._1)
+				tmpBids.append(optObjVal_i._2)
 			}
+		}
+
+		/*
+			Each object which has received a bid determines the histest bidder and
+			updates its price accordingly
+		*/
+		for (j <- 0 to probSize)
+		{
+
 		}
 
 		(new Array[Int](1), new Array[Double](1))
