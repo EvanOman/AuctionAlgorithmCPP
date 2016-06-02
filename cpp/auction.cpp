@@ -193,7 +193,7 @@ void auctionRound(vector<int>* assignment, vector<double>* prices, vector<int>* 
 			if (VERBOSE)
 				cout << "Assigning object " << j << " to person " << unAssig[i_j]<< endl;
 
-			/* Assign oobject j to i_j and update the price vector */
+			/* Assign object j to i_j and update the price vector */
 			assignment->at(unAssig[i_j]) = j;
 			prices->at(j) = prices->at(j) + highestBidForJ;
 		}
