@@ -22,7 +22,7 @@ class AssignmentProblem(val probSize: Int)
 		while (eps > 1d / probSize)
 		{
 			/* Reset the assignment vector, only the prices persist */
-			assignment = assignment.map(x => INF)
+			assignment = Array.fill(probSize){INF}
 			while (assignment.contains(INF))
 			{
 				iter += 1
@@ -34,12 +34,6 @@ class AssignmentProblem(val probSize: Int)
 			}
 			eps *= .25
 		}
-		if (VERBOSE)
-		{
-			println("Final Assignments: ")
-			assignment.zipWithIndex.foreach(x => println(s"$x"))
-		}
-
 		/* Calculate time difference */
 		val diff = (System.nanoTime() - beginT) / 1e9d
 		println(s"Took $diff seconds")
@@ -54,19 +48,24 @@ class AssignmentProblem(val probSize: Int)
 	{
 		/* Local copies */
 		var (u, v) = (assignment, prices)
-		/* Array of tuples: bidder, item, bid*/
-		val bids = ArrayBuffer.empty[(Int, Int, Double)]
-		for (i <- 0 until probSize)
+		/* Maps an object to the bids for that object (bids are (bidder, bid_amount) pairs) */
+		val bidMap = collection.mutable.Map[Int, ArrayBuffer[(Int, Double)]]()
+		var i = 0
+
+		/* TODO: This would be parallelizable if I find a way to merge the hash map in the end (cost worth it?) */
+		/* TODO: Matching */
+		while (i < probSize)
 		{
 			if (u(i) == INF)
 			{
 				/*
 					Need the best and second best value of each object to this person
-					where value is calculated row_{j} - prices{j}
+					where value is calculated row{j} - prices{j}
 				*/
 				var optObjVal_i = (-1, -INF.toDouble)
 				var secOptObjVal_i= (-1, -INF.toDouble)
-				for (j <- 0 until probSize)
+				var j = 0
+				while (j < probSize)
 				{
 					val curVal = C(i, j) - v(j)
 					if (curVal > optObjVal_i._2)
@@ -79,41 +78,53 @@ class AssignmentProblem(val probSize: Int)
 					{
 						secOptObjVal_i = (j, curVal)
 					}
+					j += 1
 				}
 				/* Computes the highest reasonable bid for the best object for this person */
-				val bid_i = (optObjVal_i._2 - secOptObjVal_i._2) + eps
+				val (bidObj_i, bidIncr_i) = optObjVal_i
+				val bid_i = (bidIncr_i - secOptObjVal_i._2) + eps
 				/* Store the bidding info for future use */
-				bids.append((i, optObjVal_i._1, bid_i))
+				if (bidMap.contains(bidObj_i))
+				{
+					bidMap(bidObj_i).append((i, bid_i))
+				}
+				else
+				{
+					bidMap(bidObj_i) = ArrayBuffer((i, bid_i))
+				}
 			}
+			i += 1
 		}
-		if (VERBOSE) bids.foreach(x => println(s"$x"))
 		/*
 			We loop over the objects with a bid, chooses the one with the highest bid
 		*/
-		for (j <- 0 until probSize)
+		for ((j, bids) <- bidMap)
 		{
-			/* Find objects which have selected j */
-			val want_j = bids.filter(_._2 == j)
-			if (want_j.nonEmpty)
-			{
-				/* Need to get the highest bid for j */
-				val topBid_j = want_j.reduce((x, y) => if (x._3 > y._3) x else y)
-				/* Find other persons who has object j and make them unassigned */
-				u = u.zipWithIndex.map(x => {
-					if (x._1 == j)
-					{
-						if (VERBOSE) println(s"Unassigning pair $x")
-						INF
-					}
-					else
-						x._1
-				})
-				/* Make assignment, update price */
-				if (VERBOSE) println(s"Making assignment $topBid_j")
-				u(topBid_j._1) = j
-				v(j) += topBid_j._3
-			}
+			/* Need to get the highest bid for j */
+			val topBid_j = bids.maxBy(_._2)
+			/* Find other persons who has object j and make them unassigned */
+			u = unAssignJ(u, j)
+			/* Make assignment, update price */
+			u(topBid_j._1) = j
+			v(j) += topBid_j._2
 		}
 		(u, v)
+	}
+
+	/* Finds the object assigned to j, unassigns it */
+	def unAssignJ(arr: Array[Int], j: Int): Array[Int] =
+	{
+		val local = arr
+		var (i, found) = (0, false)
+		while (i < probSize && !found)
+		{
+			if (local(i) == j)
+			{
+				local(i) = INF
+				found = true
+			}
+			i += 1
+		}
+		local
 	}
 }
