@@ -8,6 +8,7 @@ class AssignmentProblem(val probSize: Int)
 {
 	val C: DenseMatrix[Double] = ceil(DenseMatrix.rand(this.probSize, this.probSize) * this.probSize.toDouble)
 	val INF = Int.MaxValue
+	val INFD = Double.MaxValue
 	val VERBOSE = false
 
 	/* Main Auction Loop */
@@ -29,7 +30,7 @@ class AssignmentProblem(val probSize: Int)
 				/*
 					Update assignment, price with this nasty match / case statement
 				*/
-				val resTup = auctionRound(assignment, prices, eps)
+				val resTup = auctionRoundPar(assignment, prices, eps)
 				assignment = resTup._1; prices = resTup._2
 			}
 			eps *= .25
@@ -53,7 +54,6 @@ class AssignmentProblem(val probSize: Int)
 		var i = 0
 
 		/* TODO: This would be parallelizable if I find a way to merge the hash map in the end (cost worth it?) */
-		/* TODO: Matching */
 		while (i < probSize)
 		{
 			if (u(i) == INF)
@@ -62,8 +62,8 @@ class AssignmentProblem(val probSize: Int)
 					Need the best and second best value of each object to this person
 					where value is calculated row{j} - prices{j}
 				*/
-				var optObjVal_i = (-1, -INF.toDouble)
-				var secOptObjVal_i= (-1, -INF.toDouble)
+				var optObjVal_i = (-1, -INFD)
+				var secOptObjVal_i= (-1, -INFD)
 				var j = 0
 				while (j < probSize)
 				{
@@ -107,6 +107,83 @@ class AssignmentProblem(val probSize: Int)
 			/* Make assignment, update price */
 			u(topBid_j._1) = j
 			v(j) += topBid_j._2
+		}
+		(u, v)
+	}
+
+	/* Single Auction Round */
+	def auctionRoundPar(assignment: Array[Int], prices: Array[Double], eps: Double): (Array[Int], Array[Double]) =
+	{
+		/* Local copies */
+		var (u, v) = (assignment, prices)
+		/* Maps an object to the bids for that object (bids are (bidder, bid_amount) pairs) */
+		val bidMap = collection.mutable.Map[Int, (Int, Double)]()
+
+		/* parallelized loop */
+		(0 until probSize).par.map(i =>
+		{
+			if (u(i) == INF)
+			{
+				/*
+					Need the best and second best value of each object to this person
+					where value is calculated row{j} - prices{j}
+				*/
+				var optObjVal_i = (-1, -INFD)
+				var secOptObjVal_i= (-1, -INFD)
+				var j = 0
+				while (j < probSize)
+				{
+					val curVal = C(i, j) - v(j)
+					if (curVal > optObjVal_i._2)
+					{
+						/* Update book keeping, assign new best val/obj */
+						secOptObjVal_i = optObjVal_i
+						optObjVal_i = (j, curVal)
+					}
+					else if (curVal > secOptObjVal_i._2)
+					{
+						secOptObjVal_i = (j, curVal)
+					}
+					j += 1
+				}
+				/* Computes the highest reasonable bid for the best object for this person */
+				val (bidObj_i, bidIncr_i) = optObjVal_i
+				val bid_i = (bidIncr_i - secOptObjVal_i._2) + eps
+				/* Store the bidding info for future use */
+				(bidObj_i, i, bid_i)
+			}
+			else
+			{
+				(-1, -1, -1d)
+			}
+		}).foreach(bidObj => {
+			val (bidItem, bidder, bid) = bidObj
+			if (bidItem != -1)
+			{
+				val curBid: (Int, Double) = bidMap.getOrElse(bidItem, (-1, -1d))
+				if (curBid != (-1, -1d))
+				{
+					if (curBid._2 < bid)
+					{
+						bidMap(bidItem) = (bidder, bid)
+					}
+				}
+				else
+				{
+					bidMap(bidItem) = (bidder, bid)
+				}
+			}
+		})
+		/*
+			We loop over the objects with a bid, chooses the one with the highest bid
+		*/
+		for ((j, bid) <- bidMap)
+		{
+			/* Find other persons who has object j and make them unassigned */
+			u = unAssignJ(u, j)
+			/* Make assignment, update price */
+			u(bid._1) = j
+			v(j) += bid._2
 		}
 		(u, v)
 	}
