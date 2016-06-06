@@ -4,6 +4,5 @@ This is a repo contains several implementation of Bertsekas's Auction Algorithm.
 
 Implementations:
 
-1.  **C++**: Complete implementation. On my machine the code could solve a size 500 assignment problem in ~.03 seconds. I compiled the code using the command `g++-5 ./auction.cpp -Ofast -std=c++14 -o auction`.
-2. **Java**: Status: WIP (may be deleted)
-3. **Scala**: Complete implementation. After a bit of optimization, this implementation can solve a size 500 assignment problem in ~.125 seconds. Still working on further optimization. 
+1. **C++**: Complete implementation. On my machine the code could solve a size 500 assignment problem in ~.03 seconds. I compiled the code using the command `g++-5 ./auction.cpp -Ofast -std=c++14 -o auction`.
+2. **Scala**: Complete implementation. After a bit of optimization, this implementation can solve a size 500 assignment problem in ~.125 seconds. Also implemented a parallel version, seems to outperform the sequential version once the problem size is over 5000. 
