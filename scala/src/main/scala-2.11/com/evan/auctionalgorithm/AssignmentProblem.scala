@@ -12,7 +12,7 @@ class AssignmentProblem(val probSize: Int)
 	val VERBOSE = false
 
 	/* Main Auction Loop */
-	def runAuction(): Unit =
+	def runAuction(roundFun: (Array[Int], Array[Double], Double) => (Array[Int], Array[Double])): Double =
 	{
 		var assignment = Array.fill(probSize){INF}
 		var prices = Array.fill(probSize){1d}
@@ -30,14 +30,14 @@ class AssignmentProblem(val probSize: Int)
 				/*
 					Update assignment, price with this nasty match / case statement
 				*/
-				val resTup = auctionRoundPar(assignment, prices, eps)
+				val resTup = roundFun(assignment, prices, eps)
 				assignment = resTup._1; prices = resTup._2
 			}
 			eps *= .25
 		}
 		/* Calculate time difference */
 		val diff = (System.nanoTime() - beginT) / 1e9d
-		println(s"Took $diff seconds")
+		diff
 	}
 
 	/*
@@ -53,7 +53,6 @@ class AssignmentProblem(val probSize: Int)
 		val bidMap = collection.mutable.Map[Int, ArrayBuffer[(Int, Double)]]()
 		var i = 0
 
-		/* TODO: This would be parallelizable if I find a way to merge the hash map in the end (cost worth it?) */
 		while (i < probSize)
 		{
 			if (u(i) == INF)
@@ -120,43 +119,36 @@ class AssignmentProblem(val probSize: Int)
 		val bidMap = collection.mutable.Map[Int, (Int, Double)]()
 
 		/* parallelized loop */
-		(0 until probSize).par.map(i =>
+		(0 until probSize).filter(u(_) == INF).par.map(i =>
 		{
-			if (u(i) == INF)
+			/*
+				Need the best and second best value of each object to this person
+				where value is calculated row{j} - prices{j}
+			*/
+			var optObjVal_i = (-1, -INFD)
+			var secOptObjVal_i= (-1, -INFD)
+			var j = 0
+			while (j < probSize)
 			{
-				/*
-					Need the best and second best value of each object to this person
-					where value is calculated row{j} - prices{j}
-				*/
-				var optObjVal_i = (-1, -INFD)
-				var secOptObjVal_i= (-1, -INFD)
-				var j = 0
-				while (j < probSize)
+				val curVal = C(i, j) - v(j)
+				if (curVal > optObjVal_i._2)
 				{
-					val curVal = C(i, j) - v(j)
-					if (curVal > optObjVal_i._2)
-					{
-						/* Update book keeping, assign new best val/obj */
-						secOptObjVal_i = optObjVal_i
-						optObjVal_i = (j, curVal)
-					}
-					else if (curVal > secOptObjVal_i._2)
-					{
-						secOptObjVal_i = (j, curVal)
-					}
-					j += 1
+					/* Update book keeping, assign new best val/obj */
+					secOptObjVal_i = optObjVal_i
+					optObjVal_i = (j, curVal)
 				}
-				/* Computes the highest reasonable bid for the best object for this person */
-				val (bidObj_i, bidIncr_i) = optObjVal_i
-				val bid_i = (bidIncr_i - secOptObjVal_i._2) + eps
-				/* Store the bidding info for future use */
-				(bidObj_i, i, bid_i)
+				else if (curVal > secOptObjVal_i._2)
+				{
+					secOptObjVal_i = (j, curVal)
+				}
+				j += 1
 			}
-			else
-			{
-				(-1, -1, -1d)
-			}
-		}).foreach(bidObj => {
+			/* Computes the highest reasonable bid for the best object for this person */
+			val (bidObj_i, bidIncr_i) = optObjVal_i
+			val bid_i = (bidIncr_i - secOptObjVal_i._2) + eps
+			/* Store the bidding info for future use */
+			(bidObj_i, i, bid_i)
+		}).toList.foreach(bidObj => {
 			val (bidItem, bidder, bid) = bidObj
 			if (bidItem != -1)
 			{
