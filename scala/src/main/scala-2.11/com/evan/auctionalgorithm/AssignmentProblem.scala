@@ -1,18 +1,26 @@
 package com.evan.auctionalgorithm
 
+import java.io.File
+
 import breeze.linalg._
 import breeze.numerics._
 import scala.collection.mutable._
 
-class AssignmentProblem(val probSize: Int)
+class AssignmentProblem(val C: DenseMatrix[Double])
 {
-	val C: DenseMatrix[Double] = ceil(DenseMatrix.rand(this.probSize, this.probSize) * this.probSize.toDouble)
+	val probSize = C.cols
 	val INF = Int.MaxValue
 	val INFD = Double.MaxValue
 	val VERBOSE = false
 
+	/* Random problem instance*/
+	def this(probSize: Int) = this(ceil(DenseMatrix.rand(probSize, probSize) * probSize.toDouble))
+
+	/* Reference problem instance */
+	def this() = this(csvread(new File("./dat/C.csv")))
+
 	/* Main Auction Loop */
-	def runAuction(roundFun: (Array[Int], Array[Double], Double) => (Array[Int], Array[Double])): Double =
+	def runAuction(roundFun: (Array[Int], Array[Double], Double) => (Array[Int], Array[Double])): (Array[Int], Double) =
 	{
 		var assignment = Array.fill(probSize){INF}
 		var prices = Array.fill(probSize){1d}
@@ -36,8 +44,8 @@ class AssignmentProblem(val probSize: Int)
 			eps *= .25
 		}
 		/* Calculate time difference */
-		val diff = (System.nanoTime() - beginT) / 1e9d
-		diff
+		val diff: Double = (System.nanoTime() - beginT) / 1e9d
+		(assignment, diff)
 	}
 
 	/*
@@ -50,7 +58,7 @@ class AssignmentProblem(val probSize: Int)
 		/* Local copies */
 		var (u, v) = (assignment, prices)
 		/* Maps an object to the bids for that object (bids are (bidder, bid_amount) pairs) */
-		val bidMap = collection.mutable.Map[Int, ArrayBuffer[(Int, Double)]]()
+		val bidMap = collection.mutable.Map[Int, (Int, Double)]()
 		var i = 0
 
 		while (i < probSize)
@@ -80,16 +88,20 @@ class AssignmentProblem(val probSize: Int)
 					j += 1
 				}
 				/* Computes the highest reasonable bid for the best object for this person */
-				val (bidObj_i, bidIncr_i) = optObjVal_i
+				val (bidItem, bidIncr_i) = optObjVal_i
 				val bid_i = (bidIncr_i - secOptObjVal_i._2) + eps
-				/* Store the bidding info for future use */
-				if (bidMap.contains(bidObj_i))
+				/* Keep the best bid */
+				val curBid: (Int, Double) = bidMap.getOrElse(bidItem, (-1, -1d))
+				if (curBid != (-1, -1d))
 				{
-					bidMap(bidObj_i).append((i, bid_i))
+					if (curBid._2 < bid_i)
+					{
+						bidMap(bidItem) = (i, bid_i)
+					}
 				}
 				else
 				{
-					bidMap(bidObj_i) = ArrayBuffer((i, bid_i))
+					bidMap(bidItem) = (i, bid_i)
 				}
 			}
 			i += 1
@@ -97,15 +109,15 @@ class AssignmentProblem(val probSize: Int)
 		/*
 			We loop over the objects with a bid, chooses the one with the highest bid
 		*/
-		for ((j, bids) <- bidMap)
+		for ((j, bidObj) <- bidMap)
 		{
 			/* Need to get the highest bid for j */
-			val topBid_j = bids.maxBy(_._2)
+			val (bidder, bid) = bidObj
 			/* Find other persons who has object j and make them unassigned */
 			u = unAssignJ(u, j)
 			/* Make assignment, update price */
-			u(topBid_j._1) = j
-			v(j) += topBid_j._2
+			u(bidder) = j
+			v(j) += bid
 		}
 		(u, v)
 	}
