@@ -1,11 +1,5 @@
 package com.evan.auctionalgorithm
-
-import java.io.File
-
 import breeze.linalg._
-import breeze.numerics._
-import scala.collection.mutable._
-
 /*
 	Creates a problem instance where we are trying to assign people to objects
 */
@@ -16,6 +10,7 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 	val INF = Int.MaxValue
 	val INFD = Double.MaxValue
 	val VERBOSE = false
+	val maxC = max(C)
 
 	/* Random n*m problem instance*/
 	def this(n: Int, m: Int) = this(util.randIntMat(n, m))
@@ -23,18 +18,15 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 	/* Random square problem instance*/
 	def this(probSize: Int) = this(probSize, probSize)
 
-//	/* Reference problem instance */
-//	def this() = this(csvread(new File("./dat/C.csv")))
-
 	/* Main Auction Loop */
-	def runAuction(roundFun: (Array[Int], Array[Double], Double) => (Array[Int], Array[Double])): (Matrix[Int], Int) =
+	def auctionSolve(roundFun: (Array[Int], Array[Double], Double) => (Array[Int], Array[Double])): (Matrix[Int], Int) =
 	{
 		var assignment = Array.fill(nPers){INF}
-		var prices = Array.fill(nObjs){1d}
-		var eps = 1d
+		var prices = Array.fill(nObjs){0d}
+		var eps = .3d
 		var iter = 1
 		val beginT = System.nanoTime()
-		while (eps > 1d / nPers)
+		while (eps > 1d / (nObjs + 1))
 		{
 			/* Reset the assignment vector, only the prices persist */
 			assignment = Array.fill(nPers){INF}
@@ -60,14 +52,10 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 	}
 
 	/* Default to sequential implementation */
-	def runAuction(): (Matrix[Int], Int) =
+	def auctionSolve(): (Matrix[Int], Int) =
 	{
-		runAuction(auctionRound)
+		auctionSolve(auctionRound)
 	}
-
-	/*
-		TODO: This whole auctionRound routine reeks of mutability, is there a more functional approach?
-	*/
 
 	/* Single Auction Round */
 	def auctionRound(assignment: Array[Int], prices: Array[Double], eps: Double): (Array[Int], Array[Double]) =
@@ -209,8 +197,36 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 		(u, v)
 	}
 
+	/* An enumerative solver for checking the auction algorithm results */
+	def enumSolve(): (Matrix[Int], Int) =
+	{
+		/*
+			Loop over all possible assignments, finding the best
+			The way this works is I want all permutations of all combinations of nObjs persons
+			The order of each permutation then defines the assignment
+		*/
+		var best = (0 until nPers).toList
+		var bestScore: Int = scoreAssig(best)
+		var counter = 0
+		(0 until nObjs).combinations(nPers).map(_.permutations).reduce(_++_).foreach(
+			assig =>
+			{
+				val score = scoreAssig(assig)
+				if (score > bestScore)
+				{
+					best = assig.toList
+					bestScore = score
+				}
+				counter = counter + 1
+			}
+		)
+		val formatter = java.text.NumberFormat.getNumberInstance
+		val sc = formatter.format(bestScore)
+		(assigArr2Mat(best), bestScore)
+	}
+
 	/* Finds the object assigned to j, unassigns it */
-	def unAssignJ(arr: Array[Int], j: Int): Array[Int] =
+	private def unAssignJ(arr: Array[Int], j: Int): Array[Int] =
 	{
 		val local = arr
 		var (i, found) = (0, false)
@@ -226,43 +242,13 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 		local
 	}
 
-	def assigArr2Mat(assigVec: Array[Int]): Matrix[Int] =
+	private def assigArr2Mat(assigVec: Seq[Int]): Matrix[Int] =
 	{
 		Matrix.tabulate[Int](nPers, nObjs){case (i, j) => if (assigVec(i) == j) 1 else 0}
 	}
 
-	def runEnum(): (Matrix[Int], Double) =
-	{
-//		println("Running enum...")
-		/*
-			Loop over all possible assignments, finding the best
-			The way this works is I want all permutations of all combinations of nObjs persons
-			The order of each permutation then defines the assignment
-		*/
-		var best = (0 until nPers).toArray
-		var bestScore = scoreAssig(best)
-		var counter = 0
-		(0 until nObjs).combinations(nPers).map(_.permutations).reduce(_++_).foreach(
-			assig =>
-			{
-				val score = scoreAssig(assig.toArray)
-				if (score > bestScore)
-				{
-					best = assig.toArray
-					bestScore = score
-				}
-				counter = counter + 1
-			}
-		)
-		val formatter = java.text.NumberFormat.getNumberInstance
-		val sc = formatter.format(bestScore)
-//		println(s"Checked $counter permuations")
-//		println(s"Enum complete, best score: $sc")
-		(assigArr2Mat(best), bestScore)
-	}
-
 	/* Score the assignment vector: List[(obj, pers)]*/
-	def scoreAssig(assig: Array[Int]): Int =
+	private def scoreAssig(assig: Seq[Int]): Int =
 	{
 		assig.zipWithIndex.foldLeft(0)((acc, i) => acc + C(i._2, i._1))
 	}
@@ -271,5 +257,6 @@ class AssignmentProblem(val C: DenseMatrix[Int])
 object util
 {
 	val r = scala.util.Random
+	r.setSeed(1234)
 	def randIntMat(n: Int, m: Int): DenseMatrix[Int] = DenseMatrix.tabulate[Int](n,m){case _ => r.nextInt(n*m)}
 }
