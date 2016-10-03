@@ -12,7 +12,7 @@
 using namespace std;
 
 #define INF numeric_limits<int>::max()
-#define VERBOSE true
+#define VERBOSE false
 
 /* Pre-declare functions to allow arbitrary call ordering  */
 void randAuction(int N);
@@ -259,7 +259,7 @@ tuple<int, vector<int>> readMatrix(char* fName)
 		counter++;
 		lines.push_back(line);
 		char * pch;
-		char lineC[1024];
+		char lineC[10240];
 		strcpy(lineC, line.c_str());
 		pch = strtok (lineC,"\t");
 		while (pch != NULL)
