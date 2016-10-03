@@ -1,25 +1,52 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <limits>
 #include <stdlib.h>
 #include <math.h>
 #include <chrono>
 #include <algorithm>
+#include <string.h>
+#include <stdio.h>
+#include <tuple>
 using namespace std;
 
 #define INF numeric_limits<int>::max()
-#define VERBOSE false
+#define VERBOSE true
 
 /* Pre-declare functions to allow arbitrary call ordering  */
-void auction(int N);
+void randAuction(int N);
+void auction(int N, vector<int> C);
 void auctionRound(vector<int>* assignment, vector<double>* prices, vector<int>* C, double epsilon);
 vector<int> makeRandC(int size);
+tuple<int, vector<int>> readMatrix(char* fName);
 void printMatrix(vector<auto>* mat, int size);
 vector<int> getIndicesWithVal(vector<int>* v, int val);
 void reset(vector<auto>* v, auto val);
 void printVec(vector<auto>* v);
+void runRand();
 
-int main()
+int main(int argc, char* argv[])
+{
+	if (argc > 2 && strcmp(argv[1], "-fname") == 0)
+	{
+		/* Read in the file */
+		cout << "Reading in file: " << argv[2] << "\n";
+		tuple<int, vector<int>> matrixTuple = readMatrix(argv[2]);
+		int probSize = get<0>(matrixTuple);
+		vector<int> C = get<1>(matrixTuple);
+		cout << "Running auction" << endl;
+		auction(probSize, C);
+	}
+	else
+	{
+		/* Run random */
+		runRand();
+	}
+	return 0;
+}
+
+void runRand()
 {
 	cout << "Enter 0 if 500x500 problem size, 1 for custom size: ";
 	int isCustom;
@@ -29,20 +56,23 @@ int main()
 		cout << "Please enter a problem size: ";
 		int probSize;
 		cin >> probSize;
-		auction(probSize);
+		randAuction(probSize);
 	}
 	else
 	{
 		/* Run on fixed size problem */
-		auction(500);
+		randAuction(500);
 	}
-	return 0;
 }
 
-void auction(int N)
+void randAuction(int N)
 {
 	vector<int> C = makeRandC(N);
+	auction(N, C);
+}
 
+void auction(int N, vector<int> C)
+{
 	if (VERBOSE)
 	{
 		cout << "Cost matrix: " << endl;
@@ -215,6 +245,30 @@ vector<int> makeRandC(int size)
 		}
 	}
 	return mat;
+}
+
+tuple<int, vector<int>> readMatrix(char* fName)
+{
+	vector<string> lines;
+	vector<int> ints;
+	ifstream infile_buf(fName);
+	string line;
+	int counter = 0;
+	while(getline(infile_buf, line))
+	{
+		counter++;
+		lines.push_back(line);
+		char * pch;
+		char lineC[1024];
+		strcpy(lineC, line.c_str());
+		pch = strtok (lineC,"\t");
+		while (pch != NULL)
+		{
+			ints.push_back(atoi(pch));
+			pch = strtok (NULL, "\t");
+		}
+	}
+	return make_tuple(counter, ints);
 }
 
 void printMatrix(vector<auto>* mat, int size)
