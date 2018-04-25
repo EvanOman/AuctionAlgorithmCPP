@@ -20,10 +20,10 @@ void auction(int N, vector<int> C);
 void auctionRound(vector<int>* assignment, vector<double>* prices, vector<int>* C, double epsilon);
 vector<int> makeRandC(int size);
 tuple<int, vector<int>> readMatrix(char* fName);
-void printMatrix(vector<auto>* mat, int size);
-vector<int> getIndicesWithVal(vector<int>* v, int val);
-void reset(vector<auto>* v, auto val);
-void printVec(vector<auto>* v);
+template <typename T> void printMatrix(vector<T>* mat, int size);
+template <typename T> vector<int> getIndicesWithVal(vector<T>* v, T val);
+template <typename T> void reset(vector<T>* v, T val);
+template <typename T> void printVec(vector<T>* v);
 void runRand();
 
 int main(int argc, char* argv[])
@@ -271,7 +271,7 @@ tuple<int, vector<int>> readMatrix(char* fName)
 	return make_tuple(counter, ints);
 }
 
-void printMatrix(vector<auto>* mat, int size)
+template <typename T> void printMatrix(vector<T>* mat, int size)
 {
 	for(int i = 0; i < size; i++)
 	{
@@ -283,7 +283,7 @@ void printMatrix(vector<auto>* mat, int size)
 	}
 }
 
-void printVec(vector<auto>* v)
+template <typename T> void printVec(vector<T>* v)
 {
 	for(int i = 0; i < v->size(); i++)
 	{
@@ -300,7 +300,7 @@ void printVec(vector<auto>* v)
 }
 
 /* Returns a vector of indices from v which have the specified value val */
-vector<int> getIndicesWithVal(vector<int>* v, int val)
+template <typename T> vector<int> getIndicesWithVal(vector<T>* v, T val)
 {
 	vector<int> out;
 	for (int i = 0; i < v->size(); i++)
@@ -313,7 +313,7 @@ vector<int> getIndicesWithVal(vector<int>* v, int val)
 	return out;
 }
 
-void reset(vector<auto>* v, auto val)
+template <typename T> void reset(vector<T>* v, T val)
 {
 	for (int i = 0; i < v->size(); i++)
 	{
