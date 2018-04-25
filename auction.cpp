@@ -12,7 +12,7 @@
 using namespace std;
 
 #define INF numeric_limits<int>::max()
-#define VERBOSE false
+#define VERBOSE true
 
 /* Pre-declare functions to allow arbitrary call ordering  */
 void randAuction(int N);
@@ -25,6 +25,7 @@ template <typename T> vector<int> getIndicesWithVal(vector<T>* v, T val);
 template <typename T> void reset(vector<T>* v, T val);
 template <typename T> void printVec(vector<T>* v);
 void runRand();
+double scoreAssignment(vector<int> *assignment, vector<int>* costMat);
 
 int main(int argc, char* argv[])
 {
@@ -114,14 +115,12 @@ void auction(int N, vector<int> C)
 	cout << "Total time:\t" << timing / 1000.0 << endl;
 	cout << "Total CPU time:\t" << time << endl;
 
-	if (VERBOSE)
+	cout << endl << endl << "Solution: " << endl;
+	for (int i = 0; i < assignment.size(); i++)
 	{
-		cout << endl << endl << "Solution: " << endl;
-		for (int i = 0; i < assignment.size(); i++)
-		{
-			cout << "Person " << i << " gets object " << assignment[i] << endl;
-		}
+		cout << "Person " << i << " gets object " << assignment[i] << endl;
 	}
+	cout << "Optimal value: " << scoreAssignment(&assignment, &C);
 }
 
 void auctionRound(vector<int>* assignment, vector<double>* prices, vector<int>* C, double epsilon)
@@ -319,4 +318,16 @@ template <typename T> void reset(vector<T>* v, T val)
 	{
 		v->at(i) = val;
 	}
+}
+
+double scoreAssignment(vector<int> *assignment, vector<int>* costMat)
+{
+	double score = 0.0;
+	int n = assignment->size();
+	for (int i = 0; i < n; i++)
+	{
+		int j = assignment->at(i);
+		score += costMat->at(i + j*n);
+	}
+	return score;
 }
