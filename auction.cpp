@@ -12,11 +12,11 @@
 using namespace std;
 
 #define INF numeric_limits<int>::max()
-#define VERBOSE true
+#define VERBOSE false
 
 /* Pre-declare functions to allow arbitrary call ordering  */
 void randAuction(int N);
-void auction(int N, vector<int> C);
+void auction(int N, vector<int> &C);
 void auctionRound(vector<int>* assignment, vector<double>* prices, vector<int>* C, double epsilon);
 vector<int> makeRandC(int size);
 tuple<int, vector<int>> readMatrix(char* fName);
@@ -36,6 +36,7 @@ int main(int argc, char* argv[])
 		tuple<int, vector<int>> matrixTuple = readMatrix(argv[2]);
 		int probSize = get<0>(matrixTuple);
 		vector<int> C = get<1>(matrixTuple);
+
 		cout << "Running auction" << endl;
 		auction(probSize, C);
 	}
@@ -72,7 +73,7 @@ void randAuction(int N)
 	auction(N, C);
 }
 
-void auction(int N, vector<int> C)
+void auction(int N, vector<int> & C)
 {
 	if (VERBOSE)
 	{
