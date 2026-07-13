@@ -1,0 +1,51 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.61
+
+      - name: Build WebAssembly module
+        run: |
+          mkdir -p site/wasm
+          emcc src/auction.cpp src/problem.cpp \
+            -O3 -std=c++17 -Iinclude -fwasm-exceptions \
+            -sMODULARIZE=1 -sEXPORT_NAME=createAuctionModule -sWASM_BIGINT -sALLOW_MEMORY_GROWTH=1 \
+            -sEXPORTED_FUNCTIONS=_auction_solve,_auction_solve_trace_json,_auction_solve_problem_text_json,_auction_free_json,_malloc,_free \
+            -sEXPORTED_RUNTIME_METHODS=cwrap,UTF8ToString,stringToNewUTF8,HEAP64,HEAPU32 \
+            -o site/wasm/auction.js
+
+      - name: Assemble Pages artifact
+        run: cp -r site _site
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

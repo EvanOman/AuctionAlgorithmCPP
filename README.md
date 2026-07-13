@@ -4,6 +4,8 @@ A C++17 implementation of [Bertsekas' auction algorithm](http://dspace.mit.edu/b
 
 [![CI](https://github.com/EvanOman/AuctionAlgorithmCPP/actions/workflows/ci.yml/badge.svg)](https://github.com/EvanOman/AuctionAlgorithmCPP/actions/workflows/ci.yml)
 
+**[Live demo](https://evanoman.github.io/AuctionAlgorithmCPP/)** — the solver compiled to WebAssembly, with an animated visualization, a problem playground, and an explanation of the algorithm (`site/`, deployed by the Pages workflow).
+
 ## What's here
 
 - **Library** (`include/auction/`, `src/`) — `auction::solve`, built as both a shared library (`libauction.so`, for FFI) and a static library (for embedding), plus a C ABI (`auction_solve`) for consuming it from other languages.

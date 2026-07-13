@@ -1,0 +1,268 @@
+<title>The Auction Algorithm — a WASM demo</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Bertsekas' auction algorithm for the assignment problem, running as the repo's real C++ solver compiled to WebAssembly." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%2308090b'/%3E%3Ctext x='50' y='68' font-size='64' text-anchor='middle' fill='%23ffb000' font-family='monospace'%3E%3C/text%3E%3Cpath d='M20 78 L50 30 L80 78 M32 58 L68 58' stroke='%23ffb000' stroke-width='6' fill='none' stroke-linecap='square'/%3E%3C/svg%3E" />
+
+<div class="shell">
+  <header class="site-header">
+    <p class="kicker">n objects &middot; n bidders &middot; wasm</p>
+    <h1 class="site-title"><span class="glyph">&#9650;</span> The Auction Algorithm</h1>
+    <p class="site-subtitle">
+      Bertsekas' auction algorithm for the n&times;n assignment problem &mdash;
+      <strong>the solver on this page is the actual C++ code from
+      <a href="https://github.com/EvanOman/AuctionAlgorithmCPP" target="_blank" rel="noopener">github.com/EvanOman/AuctionAlgorithmCPP</a>,
+      compiled to WebAssembly and running client-side.</strong>
+      No server, no simulation &mdash; the same binary the CLI ships.
+    </p>
+
+    <nav class="tabnav" role="tablist" aria-label="Sections">
+      <button role="tab" id="tab-btn-demo" aria-controls="tab-demo" aria-selected="true"><span class="idx">01</span>Live demo</button>
+      <button role="tab" id="tab-btn-playground" aria-controls="tab-playground" aria-selected="false"><span class="idx">02</span>Playground</button>
+      <button role="tab" id="tab-btn-algorithm" aria-controls="tab-algorithm" aria-selected="false"><span class="idx">03</span>The algorithm</button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="wasm-status" id="wasmStatus"><span class="dot"></span><span id="wasmStatusText">loading auction.wasm&hellip;</span></div>
+
+    <!-- ============ TAB 1: LIVE DEMO ============ -->
+    <section class="tabpanel" id="tab-demo" role="tabpanel" aria-labelledby="tab-btn-demo">
+      <div class="demo-grid">
+        <div class="panel canvas-wrap">
+          <canvas id="demoCanvas" width="900" height="675" aria-label="Couriers and delivery jobs on a map, connected by assignment edges as the auction algorithm runs"></canvas>
+          <div class="canvas-legend">
+            <span class="item"><span class="legend-swatch" style="background:#ffb000"></span>courier</span>
+            <span class="item"><span class="legend-swatch" style="background:#46e0c4;border-radius:0"></span>delivery job</span>
+            <span class="item"><span class="legend-swatch" style="background:transparent;border:1px solid #ffb000;border-radius:50%"></span>price ring (radius &prop; price)</span>
+            <span class="item"><span class="legend-swatch" style="background:#ff5c5c"></span>displaced (flash)</span>
+          </div>
+        </div>
+
+        <div class="controls-stack">
+          <div class="panel">
+            <p class="panel-title">Controls</p>
+            <div class="controls-stack">
+              <label class="field">
+                Couriers / jobs (n) &mdash; <span class="field-value" id="nValue">12</span>
+                <input type="range" id="nSlider" min="4" max="40" step="1" value="12" />
+              </label>
+              <label class="field">
+                Animation speed &mdash; <span class="field-value" id="speedValue">1&times;</span>
+                <input type="range" id="speedSlider" min="1" max="10" step="1" value="4" />
+              </label>
+              <div class="control-row">
+                <button class="btn" id="rerollBtn" title="Generate a new random instance">&#8635; Re-roll</button>
+                <button class="btn primary" id="playPauseBtn">&#9654; Play</button>
+                <button class="btn" id="skipBtn">Skip to end &raquo;</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="panel-title">Live readout</p>
+            <div class="readout">
+              <div class="stat" id="statPhase"><div class="label">Phase</div><div class="value">&mdash;</div></div>
+              <div class="stat" id="statRound"><div class="label">Round</div><div class="value">&mdash;</div></div>
+              <div class="stat" id="statEpsilon"><div class="label">Epsilon</div><div class="value">&mdash;</div></div>
+              <div class="stat" id="statEvent"><div class="label">Event</div><div class="value">&mdash;</div></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="panel-title">Auction vs. greedy baseline</p>
+            <div class="compare-bar">
+              <div class="compare-row auction">
+                <span class="name">auction</span>
+                <span class="bar-track"><span class="bar-fill" id="auctionBar" style="width:0%"></span></span>
+                <span class="num" id="auctionNum">&mdash;</span>
+              </div>
+              <div class="compare-row greedy">
+                <span class="name">greedy</span>
+                <span class="bar-track"><span class="bar-fill" id="greedyBar" style="width:0%"></span></span>
+                <span class="num" id="greedyNum">&mdash;</span>
+              </div>
+            </div>
+            <p class="compare-verdict" id="compareVerdict">Run a solve to compare.</p>
+          </div>
+
+          <div class="panel">
+            <p class="panel-title">Result</p>
+            <div class="readout">
+              <div class="stat"><div class="label">Total cost</div><div class="value" id="statTotal">&mdash;</div></div>
+              <div class="stat"><div class="label">Phases</div><div class="value" id="statPhases">&mdash;</div></div>
+              <div class="stat"><div class="label">Rounds</div><div class="value" id="statRounds">&mdash;</div></div>
+              <div class="stat"><div class="label">Events</div><div class="value" id="statEvents">&mdash;</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 2: PLAYGROUND ============ -->
+    <section class="tabpanel" id="tab-playground" role="tabpanel" aria-labelledby="tab-btn-playground" hidden>
+      <div class="pg-grid">
+        <div class="panel">
+          <div class="editor-toolbar">
+            <div class="segmented" role="tablist" aria-label="Input mode">
+              <button role="tab" id="mode-btn-editor" aria-selected="true">Editor</button>
+              <button role="tab" id="mode-btn-upload" aria-selected="false">Upload</button>
+            </div>
+            <span class="mono" style="font-size:11px;color:var(--fg-faint)">problem file format &darr;</span>
+          </div>
+
+          <div id="mode-editor">
+            <textarea id="problemInput" spellcheck="false">objective min
+n 3
+4 1 3
+2 0 5
+3 2 2</textarea>
+          </div>
+
+          <div id="mode-upload" hidden>
+            <div class="upload-zone">
+              Choose a <code>.txt</code> or <code>.apf</code> problem file &mdash; it will be loaded into the editor.
+              <br />
+              <input type="file" id="fileInput" accept=".txt,.apf" />
+            </div>
+          </div>
+
+          <div class="gen-row">
+            <label class="field">n<input type="number" id="genN" value="5" min="1" max="40" /></label>
+            <label class="field">lo<input type="number" id="genLo" value="0" /></label>
+            <label class="field">hi<input type="number" id="genHi" value="20" /></label>
+            <label class="field">objective
+              <select id="genObjective">
+                <option value="min" selected>min</option>
+                <option value="max">max</option>
+              </select>
+            </label>
+            <button class="btn" id="generateBtn">&#9670; Generate random</button>
+          </div>
+
+          <div class="pg-actions">
+            <button class="btn primary" id="solveBtn">&#9654; Solve</button>
+            <button class="btn" id="downloadBtn">&#8615; Download problem (.apf)</button>
+          </div>
+
+          <div class="error-box" id="errorBox"></div>
+          <p class="error-caption">Errors come from the same C++ parser the CLI uses (<code>problem.cpp</code>), running in your browser via WebAssembly &mdash; line numbers refer to the text above.</p>
+        </div>
+
+        <div class="panel" id="resultPanel">
+          <p class="panel-title">Result</p>
+          <div class="result-empty" id="resultEmpty">No solve run yet.</div>
+          <div id="resultContent" hidden>
+            <div class="result-stats">
+              <div class="stat"><div class="label">Objective</div><div class="value" id="resObjective">&mdash;</div></div>
+              <div class="stat"><div class="label">n</div><div class="value" id="resN">&mdash;</div></div>
+              <div class="stat"><div class="label">Total cost</div><div class="value" id="resTotal">&mdash;</div></div>
+              <div class="stat"><div class="label">Phases</div><div class="value" id="resPhases">&mdash;</div></div>
+              <div class="stat"><div class="label">Rounds</div><div class="value" id="resRounds">&mdash;</div></div>
+              <div class="stat"><div class="label">Truncated</div><div class="value" id="resTruncated">&mdash;</div></div>
+            </div>
+            <table class="assign-table">
+              <thead><tr><th>Person</th><th>&rarr; Object</th><th>Cost</th></tr></thead>
+              <tbody id="assignTableBody"></tbody>
+            </table>
+            <div class="matrix-wrap" id="matrixWrap"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB 3: THE ALGORITHM ============ -->
+    <section class="tabpanel" id="tab-algorithm" role="tabpanel" aria-labelledby="tab-btn-algorithm" hidden>
+      <div class="prose">
+        <h2><span class="num">01</span>Bidding for objects</h2>
+        <p>
+          The auction algorithm treats the assignment problem as a literal auction. Every person holds a
+          price they'd pay for each object &mdash; initially zero &mdash; and repeatedly bids for whichever
+          object gives them the best deal. For person <code class="eq">i</code>, the <em>value</em> of object
+          <code class="eq">j</code> is its benefit minus its current price. Each unassigned person finds their
+          best object (highest value) and their second-best, and bids on the best one with
+        </p>
+        <p style="text-align:center"><code class="eq">bid = best_value &minus; second_best_value + &epsilon;</code></p>
+        <p>
+          That bid raises the object's price by exactly enough to erase the person's margin over the
+          runner-up option. Whoever now holds the highest price for that object wins it; if someone else
+          already owned it, they're displaced and thrown back into the pool of unassigned bidders, to rebid
+          on their own next-best object next round. Prices only ever go up, and they persist across rounds
+          &mdash; which is what keeps the process converging instead of cycling.
+        </p>
+
+        <h2><span class="num">02</span>&epsilon;-scaling</h2>
+        <p>
+          A single fixed &epsilon; makes each bid a coarse, decisive jump, which is fast but can lock in
+          ties incorrectly. The algorithm instead runs in <em>phases</em>: start with a large &epsilon;
+          (coarse, fast convergence, possibly imprecise), run the bidding process to completion, then shrink
+          &epsilon; by a constant factor and run it again. Prices carry over between phases; only the
+          assignment resets. Each phase refines the previous one's answer.
+        </p>
+        <p>
+          Termination and optimality: for <strong>integer</strong> costs, the assignment produced by a
+          completed phase is <em>exactly optimal</em> once that phase runs with <code class="eq">n&middot;&epsilon; &lt; 1</code>.
+          Below that threshold, the total bidding "slack" across all n people can't add up to a single unit
+          of cost &mdash; so a locally greedy, &epsilon;-approximate equilibrium is forced to be the global
+          optimum. That's the whole termination condition: keep scaling &epsilon; down and stop after the
+          first full phase where <code class="eq">n&middot;&epsilon; &lt; 1</code>.
+        </p>
+
+        <div class="bug-box">
+          <span class="bug-tag">&#9888; A 10-year-old bug</span>
+          <p>
+            The original 2016 implementation checked <code class="eq">&epsilon; &gt; 1/n</code>
+            <em>before</em> each phase and scaled &epsilon; down <em>after</em> it &mdash; so the last phase
+            that actually ran used an &epsilon; up to four times coarser than the
+            <code class="eq">n&middot;&epsilon; &lt; 1</code> guarantee requires. On tie-heavy cost matrices
+            (a narrow range of costs, which produces lots of near-equal bids) this returned assignments that
+            were valid but measurably suboptimal &mdash; silently, with no error or warning.
+          </p>
+          <p>
+            Full writeup, empirical repro, and the sweep against SciPy that found it:
+            <a href="https://github.com/EvanOman/AuctionAlgorithmCPP/blob/master/docs/BUGS.md" target="_blank" rel="noopener">docs/BUGS.md</a>.
+            Fixed in the 2026 modernization by restructuring the loop to guarantee one final phase below the
+            threshold; the original file is preserved unmodified at
+            <a href="https://github.com/EvanOman/AuctionAlgorithmCPP/blob/master/legacy/auction_original.cpp" target="_blank" rel="noopener">legacy/auction_original.cpp</a>
+            for comparison. <strong>This page runs the fixed solver.</strong>
+          </p>
+        </div>
+
+        <p>
+          Original reference: D. P. Bertsekas,
+          <a href="http://dspace.mit.edu/bitstream/handle/1721.1/3233/P-2064-24690022.pdf?sequence=1" target="_blank" rel="noopener">"The Auction Algorithm: A Distributed Relaxation Method for the Assignment Problem"</a>,
+          MIT LIDS, 1988.
+        </p>
+
+        <h2><span class="num">03</span>How fast is it?</h2>
+        <p>
+          Benchmarked on Linux, single-threaded, median of 3 runs, against
+          <code>scipy.optimize.linear_sum_assignment</code> &mdash; itself a C++ Hungarian /
+          Jonker&ndash;Volgenant implementation, not a naive baseline. Honestly: scipy wins across this range.
+          The gap narrows steadily as n grows and as the cost range widens &mdash; down to about a 5% gap at
+          n&#8239;=&#8239;2000 on wide cost ranges. The auction algorithm's case isn't raw single-thread speed;
+          it's conceptual simplicity (a handful of lines of bidding logic) and that the bidding step is
+          embarrassingly parallel across people, which Jonker&ndash;Volgenant is not.
+        </p>
+        <div class="bench-table-wrap">
+          <table class="bench-table">
+            <thead>
+              <tr><th>family</th><th>n</th><th>auction median (ms)</th><th>scipy median (ms)</th><th>ratio</th></tr>
+            </thead>
+            <tbody id="benchTableBody"></tbody>
+          </table>
+        </div>
+        <p class="caption">ratio = auction / scipy (lower is closer to parity). uniform_narrow draws costs from 1&hellip;n; uniform_wide from 1&hellip;1000n.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Built 2026. Original 2016 implementation preserved in the repo.</span>
+    <span><a href="https://github.com/EvanOman/AuctionAlgorithmCPP" target="_blank" rel="noopener">github.com/EvanOman/AuctionAlgorithmCPP</a></span>
+  </footer>
+</div>
+
+<script src="wasm/auction.js"></script>
+<script src="app.js"></script>
