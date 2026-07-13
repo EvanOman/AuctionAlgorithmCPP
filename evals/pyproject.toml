@@ -1,0 +1,39 @@
+[project]
+name = "auction-evals"
+version = "0.1.0"
+description = "End-to-end evals and benchmarks for the auction assignment solver"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["numpy>=2.0", "scipy>=1.14"]
+
+[project.scripts]
+auction-bench = "auction_evals.bench:main"
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-cov>=6.0.0", "ruff>=0.14.0", "ty>=0.0.8"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["auction_evals"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

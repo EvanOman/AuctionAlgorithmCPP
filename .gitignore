@@ -1,32 +1,25 @@
-#### joe made this: http://goel.io/joe
+# Build output
+build/
+compile_commands.json
 
-#####=== C++ ===#####
-
-# Compiled Object files
-*.slo
-*.lo
+# C++ artifacts (outside build/)
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
 *.so
+*.so.*
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-
-# Compiled Static libraries
-*.lai
-*.la
 *.a
 *.lib
-
-# Executables
 *.exe
 *.out
-*.app
+
+# Python (evals/)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+coverage.xml
+htmlcov/
+.cache/
