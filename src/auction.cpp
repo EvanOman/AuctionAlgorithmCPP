@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 
 namespace auction {
 
@@ -16,11 +20,23 @@ constexpr std::size_t kUnassigned = std::numeric_limits<std::size_t>::max();
 // could disturb the epsilon-optimality argument.
 constexpr std::int64_t kMaxAbsCost = std::int64_t{1} << 30;
 
+void record_award(Trace* trace, std::uint64_t phase, std::uint64_t round, double epsilon,
+                  std::size_t object, std::size_t winner, std::size_t displaced,
+                  double price_after) {
+    if (trace == nullptr) return;
+    if (trace->events.size() >= trace->max_events) {
+        trace->truncated = true;
+        return;
+    }
+    trace->events.push_back({phase, round, epsilon, object, winner, displaced, price_after});
+}
+
 // One epsilon phase of the Jacobi auction: starting from an empty assignment
 // (but keeping the prices learned by earlier phases), rounds of simultaneous
 // bidding run until every person is assigned. Returns the number of rounds.
 std::uint64_t run_phase(const std::vector<double>& benefits, std::size_t n, double epsilon,
-                        std::vector<double>& prices, std::vector<std::size_t>& assignment) {
+                        std::vector<double>& prices, std::vector<std::size_t>& assignment,
+                        Trace* trace, std::uint64_t phase_number) {
     constexpr double kNegInf = -std::numeric_limits<double>::infinity();
 
     std::fill(assignment.begin(), assignment.end(), kUnassigned);
@@ -78,6 +94,8 @@ std::uint64_t run_phase(const std::vector<double>& benefits, std::size_t n, doub
             }
             owner[j] = winner;
             assignment[winner] = j;
+            record_award(trace, phase_number, rounds, epsilon, j, winner,
+                         prev == kUnassigned ? kNoPerson : prev, prices[j]);
         }
 
         // Next round's bidders: this round's losers plus the displaced.
@@ -92,9 +110,8 @@ std::uint64_t run_phase(const std::vector<double>& benefits, std::size_t n, doub
     return rounds;
 }
 
-}  // namespace
-
-Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options) {
+Result solve_impl(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options,
+                  Trace* trace) {
     if (n == 0) throw std::invalid_argument("auction::solve: n must be >= 1");
     if (costs.size() != n * n) {
         throw std::invalid_argument("auction::solve: costs.size() must equal n * n");
@@ -134,7 +151,8 @@ Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Option
                                               : std::max(1.0, static_cast<double>(max_abs) / 2.0);
     const double threshold = 1.0 / static_cast<double>(n);
     while (true) {
-        result.rounds += run_phase(benefits, n, epsilon, result.prices, result.assignment);
+        result.rounds += run_phase(benefits, n, epsilon, result.prices, result.assignment, trace,
+                                   result.phases + 1);
         ++result.phases;
         if (epsilon < threshold) break;
         epsilon /= options.scaling_factor;
@@ -145,6 +163,47 @@ Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Option
         result.total_cost += costs[i * n + result.assignment[i]];
     }
     return result;
+}
+
+}  // namespace
+
+Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options) {
+    return solve_impl(costs, n, options, nullptr);
+}
+
+Result solve_traced(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options,
+                    Trace& trace) {
+    trace.events.clear();
+    trace.truncated = false;
+    return solve_impl(costs, n, options, &trace);
+}
+
+std::string result_to_json(const Result& result, Objective objective, const Trace* trace) {
+    std::ostringstream json;
+    json << "{\"n\": " << result.assignment.size() << ", \"objective\": \""
+         << (objective == Objective::Maximize ? "max" : "min")
+         << "\", \"total_cost\": " << result.total_cost << ", \"phases\": " << result.phases
+         << ", \"rounds\": " << result.rounds << ", \"assignment\": [";
+    for (std::size_t i = 0; i < result.assignment.size(); ++i) {
+        if (i > 0) json << ", ";
+        json << result.assignment[i];
+    }
+    json << "]";
+    if (trace != nullptr) {
+        json << ", \"truncated\": " << (trace->truncated ? "true" : "false") << ", \"events\": [";
+        for (std::size_t k = 0; k < trace->events.size(); ++k) {
+            const TraceEvent& e = trace->events[k];
+            if (k > 0) json << ", ";
+            json << "{\"phase\": " << e.phase << ", \"round\": " << e.round
+                 << ", \"epsilon\": " << e.epsilon << ", \"object\": " << e.object
+                 << ", \"winner\": " << e.winner << ", \"displaced\": "
+                 << (e.displaced == kNoPerson ? std::string("-1") : std::to_string(e.displaced))
+                 << ", \"price\": " << e.price_after << "}";
+        }
+        json << "]";
+    }
+    json << "}";
+    return json.str();
 }
 
 }  // namespace auction
@@ -168,3 +227,25 @@ extern "C" int auction_solve(const std::int64_t* costs, std::size_t n, int maxim
         return 3;
     }
 }
+
+extern "C" char* auction_solve_trace_json(const std::int64_t* costs, std::size_t n, int maximize,
+                                          std::size_t max_events) {
+    if (costs == nullptr || n == 0) return nullptr;
+    try {
+        auction::Options options;
+        options.objective = maximize ? auction::Objective::Maximize : auction::Objective::Minimize;
+        const std::vector<std::int64_t> cost_vec(costs, costs + n * n);
+        auction::Trace trace;
+        if (max_events > 0) trace.max_events = max_events;
+        const auction::Result result = auction::solve_traced(cost_vec, n, options, trace);
+        const std::string text = auction::result_to_json(result, options.objective, &trace);
+        char* out = static_cast<char*>(std::malloc(text.size() + 1));
+        if (out == nullptr) return nullptr;
+        std::memcpy(out, text.c_str(), text.size() + 1);
+        return out;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" void auction_free_json(char* json) { std::free(json); }

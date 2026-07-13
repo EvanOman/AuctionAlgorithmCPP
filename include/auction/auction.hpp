@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace auction {
@@ -51,6 +52,39 @@ struct Result {
 /// costs guarantees optimality.
 Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options = {});
 
+/// Sentinel for "no person" in trace events.
+constexpr std::size_t kNoPerson = static_cast<std::size_t>(-1);
+
+/// One object award during the auction: in round `round` of phase `phase`
+/// (running at `epsilon`), `object` was won by `winner`, displacing previous
+/// owner `displaced` (kNoPerson if the object was unowned), and its price
+/// rose to `price_after`.
+struct TraceEvent {
+    std::uint64_t phase;
+    std::uint64_t round;
+    double epsilon;
+    std::size_t object;
+    std::size_t winner;
+    std::size_t displaced;
+    double price_after;
+};
+
+struct Trace {
+    std::vector<TraceEvent> events;
+
+    /// Recording stops (solving continues) once events reaches this size.
+    std::size_t max_events = 100000;
+    bool truncated = false;
+};
+
+/// Same as solve(), additionally recording every object award into `trace`
+/// (used by the web demo to animate the algorithm's real execution).
+Result solve_traced(const std::vector<std::int64_t>& costs, std::size_t n, const Options& options,
+                    Trace& trace);
+
+/// Serialize a result (and optionally its trace) as a JSON object.
+std::string result_to_json(const Result& result, Objective objective, const Trace* trace = nullptr);
+
 }  // namespace auction
 
 /// C ABI for consuming the shared library from other languages (e.g. Python
@@ -60,3 +94,11 @@ Result solve(const std::vector<std::int64_t>& costs, std::size_t n, const Option
 ///   3 = internal failure
 extern "C" int auction_solve(const std::int64_t* costs, std::size_t n, int maximize,
                              std::size_t* assignment_out, std::int64_t* total_cost_out);
+
+/// Traced variant returning a malloc'd JSON document (solution + per-award
+/// events; see solve_traced). Caller must release it with auction_free_json.
+/// Returns NULL on error.
+extern "C" char* auction_solve_trace_json(const std::int64_t* costs, std::size_t n, int maximize,
+                                          std::size_t max_events);
+
+extern "C" void auction_free_json(char* json);

@@ -1,6 +1,8 @@
 #include "auction/problem.hpp"
 
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
 #include <sstream>
 #include <stdexcept>
 
@@ -96,6 +98,28 @@ Problem parse_problem(std::istream& in) {
     return problem;
 }
 
+namespace {
+
+std::string json_escape(const std::string& text) {
+    std::string out;
+    out.reserve(text.size());
+    for (const char c : text) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += c;
+        } else if (c == '\n') {
+            out += "\\n";
+        } else if (static_cast<unsigned char>(c) < 0x20) {
+            out += ' ';
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}
+
+}  // namespace
+
 std::string format_problem(const Problem& problem) {
     std::ostringstream out;
     out << "objective " << (problem.objective == Objective::Maximize ? "max" : "min") << "\n";
@@ -111,3 +135,30 @@ std::string format_problem(const Problem& problem) {
 }
 
 }  // namespace auction
+
+extern "C" char* auction_solve_problem_text_json(const char* text, std::size_t max_events) {
+    std::string body;
+    try {
+        if (text == nullptr) {
+            body = "{\"error\": \"null input\"}";
+        } else {
+            std::istringstream in(text);
+            const auction::Problem problem = auction::parse_problem(in);
+            auction::Options options;
+            options.objective = problem.objective;
+            auction::Trace trace;
+            if (max_events > 0) trace.max_events = max_events;
+            const auction::Result result =
+                auction::solve_traced(problem.costs, problem.n, options, trace);
+            body = auction::result_to_json(result, problem.objective, &trace);
+        }
+    } catch (const std::exception& e) {
+        body = std::string("{\"error\": \"") + auction::json_escape(e.what()) + "\"}";
+    } catch (...) {
+        body = "{\"error\": \"internal failure\"}";
+    }
+    char* out = static_cast<char*>(std::malloc(body.size() + 1));
+    if (out == nullptr) return nullptr;
+    std::memcpy(out, body.c_str(), body.size() + 1);
+    return out;
+}

@@ -176,6 +176,59 @@ TEST_CASE("input validation") {
     CHECK_THROWS_AS(solve({too_big}, 1), std::invalid_argument);
 }
 
+TEST_CASE("traced solve matches solve and yields a replayable event log") {
+    Lcg rng(7);
+    const std::size_t n = 12;
+    std::vector<std::int64_t> costs(n * n);
+    for (auto& c : costs) c = rng.next(1, 30);
+
+    auction::Trace trace;
+    const Result traced =
+        auction::solve_traced(costs, n, with_objective(Objective::Minimize), trace);
+    const Result plain = solve(costs, n);
+
+    CHECK(traced.total_cost == plain.total_cost);
+    CHECK_FALSE(trace.truncated);
+    CHECK(trace.events.size() >= n);  // every person is awarded at least once
+
+    // Replaying the awards must reproduce the final assignment.
+    std::vector<std::size_t> replay(n, auction::kNoPerson);  // object -> person
+    std::uint64_t last_phase = 0;
+    for (const auction::TraceEvent& e : trace.events) {
+        if (e.phase != last_phase) {
+            std::fill(replay.begin(), replay.end(), auction::kNoPerson);  // phases restart
+            last_phase = e.phase;
+        }
+        if (e.displaced != auction::kNoPerson) CHECK(replay[e.object] == e.displaced);
+        replay[e.object] = e.winner;
+    }
+    for (std::size_t i = 0; i < n; ++i) CHECK(replay[traced.assignment[i]] == i);
+
+    // Truncation caps recording without affecting the solution.
+    auction::Trace tiny;
+    tiny.max_events = 3;
+    const Result capped =
+        auction::solve_traced(costs, n, with_objective(Objective::Minimize), tiny);
+    CHECK(capped.total_cost == plain.total_cost);
+    CHECK(tiny.truncated);
+    CHECK(tiny.events.size() == 3);
+}
+
+TEST_CASE("trace JSON C API") {
+    const std::vector<std::int64_t> costs = {4, 1, 3,  //
+                                             2, 0, 5,  //
+                                             3, 2, 2};
+    char* json = auction_solve_trace_json(costs.data(), 3, /*maximize=*/0, 0);
+    REQUIRE(json != nullptr);
+    const std::string text(json);
+    auction_free_json(json);
+    CHECK(text.find("\"total_cost\": 5") != std::string::npos);
+    CHECK(text.find("\"events\": [{") != std::string::npos);
+    CHECK(text.find("\"truncated\": false") != std::string::npos);
+
+    CHECK(auction_solve_trace_json(nullptr, 3, 0, 0) == nullptr);
+}
+
 TEST_CASE("C API round-trip") {
     const std::vector<std::int64_t> costs = {4, 1, 3,  //
                                              2, 0, 5,  //

@@ -59,6 +59,23 @@ TEST_CASE("rejects malformed input") {
     CHECK_THROWS_AS(parse("n 1\n1 x\n"), std::runtime_error);  // trailing junk
 }
 
+TEST_CASE("text-to-JSON C API solves and reports parse errors inline") {
+    char* ok = auction_solve_problem_text_json("objective min\nn 2\n1 9\n9 1\n", 0);
+    REQUIRE(ok != nullptr);
+    const std::string ok_text(ok);
+    auction_free_json(ok);
+    CHECK(ok_text.find("\"total_cost\": 2") != std::string::npos);
+    CHECK(ok_text.find("\"objective\": \"min\"") != std::string::npos);
+    CHECK(ok_text.find("\"events\": [{") != std::string::npos);
+
+    char* bad = auction_solve_problem_text_json("n 2\n1 2\n", 0);
+    REQUIRE(bad != nullptr);
+    const std::string bad_text(bad);
+    auction_free_json(bad);
+    CHECK(bad_text.find("\"error\"") != std::string::npos);
+    CHECK(bad_text.find("line") != std::string::npos);
+}
+
 TEST_CASE("error messages carry line numbers") {
     try {
         parse("n 2\n1 2\nbogus row\n");

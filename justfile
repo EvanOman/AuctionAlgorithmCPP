@@ -52,6 +52,17 @@ fc:
 # Run everything CI runs.
 ci: format-check lint test-all
 
+# Build the WebAssembly module for the demo site (requires docker).
+wasm:
+    mkdir -p site/wasm
+    docker run --rm -v {{ justfile_directory() }}:/src -w /src -u $(id -u):$(id -g) \
+        emscripten/emsdk:3.1.61 emcc src/auction.cpp src/problem.cpp \
+        -O3 -std=c++17 -Iinclude -fwasm-exceptions \
+        -sMODULARIZE=1 -sEXPORT_NAME=createAuctionModule -sWASM_BIGINT -sALLOW_MEMORY_GROWTH=1 \
+        -sEXPORTED_FUNCTIONS=_auction_solve,_auction_solve_trace_json,_auction_solve_problem_text_json,_auction_free_json,_malloc,_free \
+        -sEXPORTED_RUNTIME_METHODS=cwrap,UTF8ToString,stringToNewUTF8,HEAP64,HEAPU32 \
+        -o site/wasm/auction.js
+
 # Remove build artifacts.
 clean:
     rm -rf build

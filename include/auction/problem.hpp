@@ -32,3 +32,10 @@ Problem parse_problem(std::istream& in);
 std::string format_problem(const Problem& problem);
 
 }  // namespace auction
+
+/// Parse a problem in the text format and solve it with a trace, returning a
+/// malloc'd JSON document (release with auction_free_json). On bad input the
+/// JSON is {"error": "..."} rather than NULL; NULL only on allocation
+/// failure. Primary consumer: the WebAssembly demo, which routes problems
+/// typed in the browser through the same parser and solver as the CLI.
+extern "C" char* auction_solve_problem_text_json(const char* text, std::size_t max_events);
