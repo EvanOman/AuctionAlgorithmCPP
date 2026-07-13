@@ -29,6 +29,14 @@
 
     <!-- ============ TAB 1: LIVE DEMO ============ -->
     <section class="tabpanel" id="tab-demo" role="tabpanel" aria-labelledby="tab-btn-demo">
+      <p class="demo-intro">
+        <strong>n couriers, n delivery jobs, each courier takes exactly one job</strong> &mdash; the classic
+        assignment problem, with distance as the cost. Watch the algorithm run it as a literal auction:
+        couriers bid for the jobs that suit them best, prices rise (the ring around each job), outbid
+        couriers get displaced and bid again, and the tangle of edges settles into the cheapest possible
+        one-to-one matching. Every step you see is a real event from the solver &mdash; compare the final
+        total against the greedy "everyone grabs the nearest job" baseline below.
+      </p>
       <div class="demo-grid">
         <div class="panel canvas-wrap">
           <canvas id="demoCanvas" width="900" height="675" aria-label="Couriers and delivery jobs on a map, connected by assignment edges as the auction algorithm runs"></canvas>
@@ -161,6 +169,7 @@ n 3
               <div class="stat"><div class="label">Phases</div><div class="value" id="resPhases">&mdash;</div></div>
               <div class="stat"><div class="label">Rounds</div><div class="value" id="resRounds">&mdash;</div></div>
               <div class="stat"><div class="label">Truncated</div><div class="value" id="resTruncated">&mdash;</div></div>
+              <div class="stat"><div class="label">Solve time</div><div class="value" id="resTime">&mdash;</div></div>
             </div>
             <table class="assign-table">
               <thead><tr><th>Person</th><th>&rarr; Object</th><th>Cost</th></tr></thead>
@@ -209,26 +218,6 @@ n 3
           first full phase where <code class="eq">n&middot;&epsilon; &lt; 1</code>.
         </p>
 
-        <div class="bug-box">
-          <span class="bug-tag">&#9888; A 10-year-old bug</span>
-          <p>
-            The original 2016 implementation checked <code class="eq">&epsilon; &gt; 1/n</code>
-            <em>before</em> each phase and scaled &epsilon; down <em>after</em> it &mdash; so the last phase
-            that actually ran used an &epsilon; up to four times coarser than the
-            <code class="eq">n&middot;&epsilon; &lt; 1</code> guarantee requires. On tie-heavy cost matrices
-            (a narrow range of costs, which produces lots of near-equal bids) this returned assignments that
-            were valid but measurably suboptimal &mdash; silently, with no error or warning.
-          </p>
-          <p>
-            Full writeup, empirical repro, and the sweep against SciPy that found it:
-            <a href="https://github.com/EvanOman/AuctionAlgorithmCPP/blob/master/docs/BUGS.md" target="_blank" rel="noopener">docs/BUGS.md</a>.
-            Fixed in the 2026 modernization by restructuring the loop to guarantee one final phase below the
-            threshold; the original file is preserved unmodified at
-            <a href="https://github.com/EvanOman/AuctionAlgorithmCPP/blob/master/legacy/auction_original.cpp" target="_blank" rel="noopener">legacy/auction_original.cpp</a>
-            for comparison. <strong>This page runs the fixed solver.</strong>
-          </p>
-        </div>
-
         <p>
           Original reference: D. P. Bertsekas,
           <a href="http://dspace.mit.edu/bitstream/handle/1721.1/3233/P-2064-24690022.pdf?sequence=1" target="_blank" rel="noopener">"The Auction Algorithm: A Distributed Relaxation Method for the Assignment Problem"</a>,
@@ -259,7 +248,7 @@ n 3
   </main>
 
   <footer class="site-footer">
-    <span>Built 2026. Original 2016 implementation preserved in the repo.</span>
+    <span>Bertsekas' auction algorithm &mdash; C++ compiled to WebAssembly, solving in your browser.</span>
     <span><a href="https://github.com/EvanOman/AuctionAlgorithmCPP" target="_blank" rel="noopener">github.com/EvanOman/AuctionAlgorithmCPP</a></span>
   </footer>
 </div>

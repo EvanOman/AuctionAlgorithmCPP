@@ -545,6 +545,7 @@ function initPlayground() {
   const resPhases = document.getElementById("resPhases");
   const resRounds = document.getElementById("resRounds");
   const resTruncated = document.getElementById("resTruncated");
+  const resTime = document.getElementById("resTime");
   const assignTableBody = document.getElementById("assignTableBody");
   const matrixWrap = document.getElementById("matrixWrap");
   const modeBtnEditor = document.getElementById("mode-btn-editor");
@@ -593,7 +594,7 @@ function initPlayground() {
     matrixWrap.appendChild(table);
   }
 
-  function renderResult(result, text) {
+  function renderResult(result, text, elapsedMs) {
     resultEmpty.hidden = true;
     resultContent.hidden = false;
 
@@ -603,6 +604,8 @@ function initPlayground() {
     resPhases.textContent = result.phases;
     resRounds.textContent = result.rounds;
     resTruncated.textContent = result.truncated ? "yes" : "no";
+    resTime.textContent =
+      elapsedMs === undefined ? "—" : elapsedMs < 1 ? elapsedMs.toFixed(2) + " ms" : elapsedMs.toFixed(1) + " ms";
 
     const info = parseProblemTextForDisplay(text);
 
@@ -625,12 +628,14 @@ function initPlayground() {
   function doSolve() {
     clearError();
     const text = problemInput.value;
+    const t0 = performance.now();
     const result = solveProblemText(text, 0);
+    const elapsedMs = performance.now() - t0;
     if (result.error) {
       showError(result.error);
       return;
     }
-    renderResult(result, text);
+    renderResult(result, text, elapsedMs);
   }
 
   function doGenerate() {

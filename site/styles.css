@@ -823,31 +823,17 @@ table.cost-matrix td.chosen {
   font-size: 0.9em;
 }
 
-.bug-box {
-  margin: 20px 0;
-  padding: 18px 20px;
-  border: 1px solid var(--coral-dim);
-  border-left: 3px solid var(--coral);
-  background: rgba(255, 92, 92, 0.06);
-  border-radius: var(--radius);
+.demo-intro {
+  max-width: 860px;
+  margin: 0 0 18px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--fg-dim);
 }
 
-.bug-box .bug-tag {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--coral);
-  margin-bottom: 10px;
-  display: block;
-}
-
-.bug-box p {
-  color: #d9cfcb;
-}
-
-.bug-box p:last-child {
-  margin-bottom: 0;
+.demo-intro strong {
+  color: var(--fg);
 }
 
 .bench-table-wrap {
